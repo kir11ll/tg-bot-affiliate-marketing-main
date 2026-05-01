@@ -4,7 +4,7 @@ compatibility_date = "2026-05-01"
 
 [vars]
 PUBLIC_CHANNEL = "@khak_partners"
-ARTICLE_URL = "https://example.com/article"
-PRIVATE_CHANNEL_ID = "-1001234567890"
+ARTICLE_URL = "https://teletype.in/@mecrover/bqHiwYN2dN4"
+PRIVATE_CHANNEL_ID = "-1002898523330"
 PAYMENT_URL = "https://example.com/pay"
 

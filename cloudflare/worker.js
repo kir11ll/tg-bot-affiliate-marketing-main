@@ -91,8 +91,8 @@ async function handleStart(update, env) {
 
   const introText =
     '<b>Привет! Чтобы забрать статью "Как выйти на первые 100к с помощью Партнерского маркетинга"</b>\n\n' +
-    "Подпишись на Партнерский канал @khak_partners\n" +
-    "Возможно благодаря именно этому каналу ты сможешь сделать рывок в доходе!";
+    "Подпишись на Партнерский канал @khak_partners\n\n" +
+    "Возможно, благодаря этому каналу ты сможешь сделать рывок в доходе!";
 
   const subscription = await isSubscribed(env.BOT_TOKEN, env.PUBLIC_CHANNEL, userId);
   if (typeof subscription === "object" && subscription.ok === false) {

@@ -38,7 +38,10 @@ function articleKeyboard(articleUrl) {
 
 function subscribeKeyboard(channelUrl) {
   return {
-    inline_keyboard: [[{ text: "ОТКРЫТЬ КАНАЛ", url: channelUrl }]],
+    inline_keyboard: [
+      [{ text: "ОТКРЫТЬ КАНАЛ", url: channelUrl }],
+      [{ text: "Подписался", callback_data: "subscribed" }],
+    ],
   };
 }
 
@@ -55,6 +58,12 @@ async function sendMessage(token, chatId, text, replyMarkup) {
     reply_markup: replyMarkup,
     parse_mode: "HTML",
   });
+}
+
+function removeReplyKeyboard() {
+  return {
+    remove_keyboard: true,
+  };
 }
 
 async function createInviteLink(token, channelId, userId) {
@@ -100,6 +109,37 @@ async function handleStart(update, env) {
   await sendMessage(env.BOT_TOKEN, chatId, "Высылаю ссылку на статью\n\nВремя на чтение 5-8 минут", articleKeyboard(env.ARTICLE_URL));
 }
 
+async function handleSubscriptionCheck(userId, chatId, env) {
+  const subscription = await isSubscribed(env.BOT_TOKEN, env.PUBLIC_CHANNEL, userId);
+  if (typeof subscription === "object" && subscription.ok === false) {
+    await sendMessage(
+      env.BOT_TOKEN,
+      chatId,
+      `Не могу проверить подписку на канал.\n\nПричина: ${subscription.error}`
+    );
+    return;
+  }
+
+  if (subscription) {
+    await sendMessage(
+      env.BOT_TOKEN,
+      chatId,
+      "Подписка подтверждена. Вот статья:\n\nВремя на чтение 5-8 минут",
+      articleKeyboard(env.ARTICLE_URL)
+    );
+    return;
+  }
+
+  await sendMessage(
+    env.BOT_TOKEN,
+    chatId,
+    "К сожалению не увидил подписки на канал @khak_partners\n\nПерепроверь подписку и нажми на кнопку подписался, сразу после выдам статью!",
+    {
+      inline_keyboard: [[{ text: "Подписался", callback_data: "subscribed" }]],
+    }
+  );
+}
+
 async function handleCallback(update, env) {
   const data = update.callback_query?.data;
   const chatId = update.callback_query?.message?.chat?.id;
@@ -123,30 +163,11 @@ async function handleCallback(update, env) {
     const chatId = update.callback_query?.message?.chat?.id;
     if (!userId || !chatId) return;
 
-    const subscription = await isSubscribed(env.BOT_TOKEN, env.PUBLIC_CHANNEL, userId);
-    if (typeof subscription === "object" && subscription.ok === false) {
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        `Не могу проверить подписку на канал.\n\nПричина: ${subscription.error}`
-      );
-    } else if (subscription) {
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        "Подписка подтверждена. Вот статья:\n\nВремя на чтение 5-8 минут",
-        articleKeyboard(env.ARTICLE_URL)
-      );
-    } else {
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        "Пока подписка не найдена. Подпишись на канал и нажми кнопку еще раз."
-      );
-    }
+    await handleSubscriptionCheck(userId, chatId, env);
 
     await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
       callback_query_id: update.callback_query.id,
+      text: "Проверяю подписку",
     });
   }
 }
@@ -178,6 +199,15 @@ export default {
 
     if (update.message?.text === "/start") {
       await handleStart(update, env);
+    }
+
+    if (update.message?.text === "Подписался") {
+      await handleSubscriptionCheck(update.message.from.id, update.message.chat.id, env);
+      await telegramRequest(env.BOT_TOKEN, "sendMessage", {
+        chat_id: update.message.chat.id,
+        text: " ",
+        reply_markup: removeReplyKeyboard(),
+      });
     }
 
     if (update.callback_query) {

@@ -1,0 +1,10 @@
+name = "tg-bot-dozmobot"
+main = "worker.js"
+compatibility_date = "2026-05-01"
+
+[vars]
+PUBLIC_CHANNEL = "@khak_partners"
+ARTICLE_URL = "https://example.com/article"
+PRIVATE_CHANNEL_ID = "-1001234567890"
+PAYMENT_URL = "https://example.com/pay"
+

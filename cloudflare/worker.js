@@ -29,10 +29,13 @@ async function isSubscribed(token, channel, userId) {
 
 function articleKeyboard(articleUrl) {
   return {
-    inline_keyboard: [
-      [{ text: "ССЫЛКА", url: articleUrl }],
-      [{ text: "Получить доступ", callback_data: "buy_access" }],
-    ],
+    inline_keyboard: [[{ text: "ССЫЛКА", url: articleUrl }]],
+  };
+}
+
+function accessKeyboard(paymentUrl) {
+  return {
+    inline_keyboard: [[{ text: "Оплатить доступ", url: paymentUrl }]],
   };
 }
 
@@ -42,12 +45,6 @@ function subscribeKeyboard(channelUrl) {
       [{ text: "ОТКРЫТЬ КАНАЛ", url: channelUrl }],
       [{ text: "Подписался", callback_data: "subscribed" }],
     ],
-  };
-}
-
-function payKeyboard(paymentUrl) {
-  return {
-    inline_keyboard: [[{ text: "Оплатить доступ", url: paymentUrl }]],
   };
 }
 
@@ -80,6 +77,17 @@ async function handleStart(update, env) {
   const userId = update.message?.from?.id;
   const chatId = update.message?.chat?.id;
   if (!userId || !chatId) return;
+
+  const startPayload = (update.message?.text || "").split(" ")[1] || "";
+  if (startPayload === "from_article") {
+    await sendMessage(
+      env.BOT_TOKEN,
+      chatId,
+      "Здесь подключим оплату. Пока можно вставить ссылку на платежный сервис или invoice.",
+      accessKeyboard(env.PAYMENT_URL || "https://example.com/pay")
+    );
+    return;
+  }
 
   const introText =
     '<b>Привет! Чтобы забрать статью "Как выйти на первые 100к с помощью Партнерского маркетинга"</b>\n\n' +
@@ -165,7 +173,7 @@ async function handleCallback(update, env) {
       env.BOT_TOKEN,
       chatId,
       "Здесь подключим оплату. Пока можно вставить ссылку на платежный сервис или invoice.",
-      payKeyboard(env.PAYMENT_URL || "https://example.com/pay")
+      accessKeyboard(env.PAYMENT_URL || "https://example.com/pay")
     );
     await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
       callback_query_id: update.callback_query.id,
@@ -212,7 +220,7 @@ export default {
 
     const update = await request.json();
 
-    if (update.message?.text === "/start") {
+    if (update.message?.text?.startsWith("/start")) {
       await handleStart(update, env);
     }
 

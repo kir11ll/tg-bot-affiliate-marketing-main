@@ -38,10 +38,7 @@ function articleKeyboard(articleUrl) {
 
 function subscribeKeyboard(channelUrl) {
   return {
-    inline_keyboard: [
-      [{ text: "ОТКРЫТЬ КАНАЛ", url: channelUrl }],
-      [{ text: "Подписался", callback_data: "subscribed" }],
-    ],
+    inline_keyboard: [[{ text: "ОТКРЫТЬ КАНАЛ", url: channelUrl }]],
   };
 }
 
@@ -77,7 +74,8 @@ async function handleStart(update, env) {
 
   const introText =
     '<b>Привет! Чтобы забрать статью "Как выйти на первые 100к с помощью Партнерского маркетинга"</b>\n\n' +
-    "Подпишись на Партнерский канал @khak_partners. Возможно благодаря именно этому каналу ты сможешь сделать рывок в доходе!";
+    "Подпишись на Партнерский канал @khak_partners\n" +
+    "Возможно благодаря именно этому каналу ты сможешь сделать рывок в доходе!";
 
   const subscription = await isSubscribed(env.BOT_TOKEN, env.PUBLIC_CHANNEL, userId);
   if (typeof subscription === "object" && subscription.ok === false) {
@@ -118,6 +116,38 @@ async function handleCallback(update, env) {
       callback_query_id: update.callback_query.id,
     });
     return;
+  }
+
+  if (data === "subscribed") {
+    const userId = update.callback_query?.from?.id;
+    const chatId = update.callback_query?.message?.chat?.id;
+    if (!userId || !chatId) return;
+
+    const subscription = await isSubscribed(env.BOT_TOKEN, env.PUBLIC_CHANNEL, userId);
+    if (typeof subscription === "object" && subscription.ok === false) {
+      await sendMessage(
+        env.BOT_TOKEN,
+        chatId,
+        `Не могу проверить подписку на канал.\n\nПричина: ${subscription.error}`
+      );
+    } else if (subscription) {
+      await sendMessage(
+        env.BOT_TOKEN,
+        chatId,
+        "Подписка подтверждена. Вот статья:\n\nВремя на чтение 5-8 минут",
+        articleKeyboard(env.ARTICLE_URL)
+      );
+    } else {
+      await sendMessage(
+        env.BOT_TOKEN,
+        chatId,
+        "Пока подписка не найдена. Подпишись на канал и нажми кнопку еще раз."
+      );
+    }
+
+    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+      callback_query_id: update.callback_query.id,
+    });
   }
 }
 

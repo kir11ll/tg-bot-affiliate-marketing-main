@@ -117,6 +117,11 @@ async function handleSubscriptionCheck(userId, chatId, env) {
       chatId,
       `Не могу проверить подписку на канал.\n\nПричина: ${subscription.error}`
     );
+    await telegramRequest(env.BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: " ",
+      reply_markup: removeReplyKeyboard(),
+    });
     return;
   }
 
@@ -127,6 +132,11 @@ async function handleSubscriptionCheck(userId, chatId, env) {
       "Подписка подтверждена. Вот статья:\n\nВремя на чтение 5-8 минут",
       articleKeyboard(env.ARTICLE_URL)
     );
+    await telegramRequest(env.BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: " ",
+      reply_markup: removeReplyKeyboard(),
+    });
     return;
   }
 
@@ -138,6 +148,11 @@ async function handleSubscriptionCheck(userId, chatId, env) {
       inline_keyboard: [[{ text: "Подписался", callback_data: "subscribed" }]],
     }
   );
+  await telegramRequest(env.BOT_TOKEN, "sendMessage", {
+    chat_id: chatId,
+    text: " ",
+    reply_markup: removeReplyKeyboard(),
+  });
 }
 
 async function handleCallback(update, env) {
@@ -203,11 +218,6 @@ export default {
 
     if (update.message?.text === "Подписался") {
       await handleSubscriptionCheck(update.message.from.id, update.message.chat.id, env);
-      await telegramRequest(env.BOT_TOKEN, "sendMessage", {
-        chat_id: update.message.chat.id,
-        text: " ",
-        reply_markup: removeReplyKeyboard(),
-      });
     }
 
     if (update.callback_query) {

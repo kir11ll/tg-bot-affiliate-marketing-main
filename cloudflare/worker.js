@@ -30,9 +30,23 @@ async function isSubscribed(token, channel, userId) {
 function articleKeyboard(articleUrl) {
   return {
     inline_keyboard: [
-      [{ text: "Открыть статью", url: articleUrl }],
+      [{ text: "ССЫЛКА", url: articleUrl }],
       [{ text: "Получить доступ", callback_data: "buy_access" }],
     ],
+  };
+}
+
+function subscribeKeyboard(channelUrl) {
+  return {
+    inline_keyboard: [[{ text: "ОТКРЫТЬ КАНАЛ", url: channelUrl }]],
+  };
+}
+
+function subscribedReplyKeyboard() {
+  return {
+    keyboard: [[{ text: "Подписался" }]],
+    resize_keyboard: true,
+    one_time_keyboard: true,
   };
 }
 
@@ -66,6 +80,10 @@ async function handleStart(update, env) {
   const chatId = update.message?.chat?.id;
   if (!userId || !chatId) return;
 
+  const introText =
+    'Привет! Чтобы забрать статью "Как выйти на первые 100к с помощью Партнерского маркетинга"\n\n' +
+    "Подпишись на самый главный Партнерский канал в телеграмме @khak_partners. Советую следить за его постами, ведь именно там дают готовые связки и продукты для выхода на хороший доход с помощью партнерского маркетинга. Возможно благодаря именно этому каналу ты сможешь сделать рывок в доходе!";
+
   const subscription = await isSubscribed(env.BOT_TOKEN, env.PUBLIC_CHANNEL, userId);
   if (typeof subscription === "object" && subscription.ok === false) {
     await sendMessage(
@@ -77,20 +95,22 @@ async function handleStart(update, env) {
   }
 
   if (!subscription) {
-    await sendMessage(
-      env.BOT_TOKEN,
-      chatId,
-      "Чтобы получить доступ, подпишитесь на канал и нажмите /start еще раз."
-    );
+    await telegramRequest(env.BOT_TOKEN, "sendMessage", {
+      chat_id: chatId,
+      text: introText,
+      reply_markup: subscribeKeyboard(`https://t.me/${String(env.PUBLIC_CHANNEL).replace("@", "")}`),
+      parse_mode: "HTML",
+    });
+    await telegramRequest(env.BOT_TOKEN, "sendPhoto", {
+      chat_id: chatId,
+      photo: env.PROMO_IMAGE_URL || "https://placehold.co/800x500/png",
+      caption: "После подписки нажми кнопку ниже.",
+      reply_markup: subscribedReplyKeyboard(),
+    });
     return;
   }
 
-  await sendMessage(
-    env.BOT_TOKEN,
-    chatId,
-    "Подписка подтверждена. Вот статья:",
-    articleKeyboard(env.ARTICLE_URL)
-  );
+  await sendMessage(env.BOT_TOKEN, chatId, "Высылаю ссылку на статью\n\nВремя на чтение 5-8 минут", articleKeyboard(env.ARTICLE_URL));
 }
 
 async function handleCallback(update, env) {
@@ -108,6 +128,7 @@ async function handleCallback(update, env) {
     await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
       callback_query_id: update.callback_query.id,
     });
+    return;
   }
 }
 

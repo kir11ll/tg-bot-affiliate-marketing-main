@@ -143,7 +143,7 @@ async function handleSubscriptionCheck(userId, chatId, env) {
   await sendMessage(
     env.BOT_TOKEN,
     chatId,
-    "К сожалению не увидил подписки на канал @khak_partners\n\nПерепроверь подписку и нажми на кнопку подписался, сразу после выдам статью!",
+    "К сожалению, не увидил подписки на канал @khak_partners\n\nПерепроверь подписку и нажми на кнопку подписался, сразу после отправлю статью!",
     {
       inline_keyboard: [[{ text: "Подписался", callback_data: "subscribed" }]],
     }

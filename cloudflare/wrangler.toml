@@ -2,9 +2,13 @@ name = "tg-bot-dozmobot"
 main = "worker.js"
 compatibility_date = "2026-05-01"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "drozmo_tg_bot_db"
+database_id = "7f12a13e-420f-4abf-90e3-e144c4396c2d"
+
 [vars]
 PUBLIC_CHANNEL = "@khak_partners"
 ARTICLE_URL = "https://teletype.in/@mecrover/bqHiwYN2dN4"
 PRIVATE_CHANNEL_ID = "-1002898523330"
 PAYMENT_URL = "https://example.com/pay"
-

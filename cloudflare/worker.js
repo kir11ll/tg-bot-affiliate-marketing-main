@@ -661,14 +661,12 @@ async function handleCallback(update, env) {
 
     if (data === "followup:method") {
       const stage = await getContentStage(env, user.id);
-      if (!stage?.payment_sent_at) {
-        await sendPaymentPost(env, chatId, user.id);
-      } else if (!stage?.followup_sent_at) {
+      if (!stage?.followup_sent_at) {
         await sendFollowupPost(env, chatId, user.id);
-      } else if (!stage?.payment_reminder1_at) {
-        await sendPaymentReminder1(env, chatId, user.id);
+      } else if (!stage?.payment_sent_at) {
+        await sendPaymentPost(env, chatId, user.id);
       } else {
-        await sendPaymentReminder2(env, chatId, user.id);
+        await sendPaymentPost(env, chatId, user.id);
       }
       await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
         callback_query_id: update.callback_query.id,

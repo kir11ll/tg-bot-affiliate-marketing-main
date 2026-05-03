@@ -987,30 +987,6 @@ async function sendPaymentReminders(env) {
   }
 }
 
-async function sendPaymentReminders(env) {
-  const now = Date.now();
-  const reminder1Cutoff = new Date(now - PAYMENT_REMINDER_1_MINUTES * 60 * 1000).toISOString();
-  const reminder2Cutoff = new Date(now - PAYMENT_REMINDER_2_MINUTES * 60 * 1000).toISOString();
-
-  const reminder1Rows = await dbAll(
-    env,
-    "SELECT user_id FROM content_stages WHERE stage = 'payment_sent' AND updated_at <= ? AND payment_completed_at IS NULL AND payment_reminder1_at IS NULL",
-    [reminder1Cutoff]
-  );
-  for (const row of reminder1Rows.results || []) {
-    await sendPaymentReminder1(env, row.user_id, row.user_id);
-  }
-
-  const reminder2Rows = await dbAll(
-    env,
-    "SELECT user_id FROM content_stages WHERE stage IN ('payment_sent','payment_reminder1_sent') AND updated_at <= ? AND payment_completed_at IS NULL AND payment_reminder1_at IS NOT NULL AND payment_reminder2_at IS NULL",
-    [reminder2Cutoff]
-  );
-  for (const row of reminder2Rows.results || []) {
-    await sendPaymentReminder2(env, row.user_id, row.user_id);
-  }
-}
-
 export default {
   async fetch(request, env) {
     await ensureSchema(env);

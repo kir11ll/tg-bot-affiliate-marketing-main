@@ -212,11 +212,20 @@ async function addPayoutRequest(env, userId, amount) {
 }
 
 async function adminIsAllowed(env, tgId) {
+  const ownerRow = await dbOne(env, "SELECT value FROM meta WHERE key = 'owner_id'");
+  if (ownerRow?.value && String(ownerRow.value) === String(tgId)) return true;
   return String(env.ADMIN_IDS || "")
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean)
     .includes(String(tgId));
+}
+
+async function claimOwnerIfNeeded(env, tgId) {
+  const ownerRow = await dbOne(env, "SELECT value FROM meta WHERE key = 'owner_id'");
+  if (!ownerRow?.value) {
+    await dbRun(env, "INSERT OR REPLACE INTO meta (key, value) VALUES ('owner_id', ?)", [String(tgId)]);
+  }
 }
 
 async function buildUserCabinet(env, tgUser) {
@@ -328,7 +337,7 @@ async function handleStart(update, env) {
   await createReferralIfNeeded(env, user, payload);
   const isAdmin = await adminIsAllowed(env, user.id);
 
-  if (payload === "cabinet") {
+  if (payload === "partner" || payload === "cabinet") {
     await sendUserCabinet(update, env);
     return;
   }
@@ -458,7 +467,7 @@ async function handleCallback(update, env) {
     return;
   }
 
-  if (data === "admin:stats") {
+    if (data === "admin:stats") {
     if (!(await adminIsAllowed(env, user.id))) return;
     await sendAdminStats(update, env);
     await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
@@ -467,7 +476,7 @@ async function handleCallback(update, env) {
     return;
   }
 
-  if (data === "admin:refs") {
+    if (data === "admin:refs") {
     if (!(await adminIsAllowed(env, user.id))) return;
     await sendAdminRefs(update, env);
     await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
@@ -476,7 +485,7 @@ async function handleCallback(update, env) {
     return;
   }
 
-  if (data === "admin:notify") {
+    if (data === "admin:notify") {
     if (!(await adminIsAllowed(env, user.id))) return;
     const enabled = (await dbOne(env, "SELECT value FROM settings WHERE key = 'notify_enabled'"))?.value === "1";
     await dbRun(env, "INSERT OR REPLACE INTO settings (key, value) VALUES ('notify_enabled', ?)", [enabled ? "0" : "1"]);
@@ -731,17 +740,24 @@ export default {
       await handleSubscriptionCheck(update.message.from.id, update.message.chat.id, env);
     }
 
+    if (update.message?.text === "/partner" || update.message?.text === "/cabinet") {
+      await sendUserCabinet(update, env);
+    }
+
     if (update.message?.text?.startsWith("/payout ")) {
       await handleManualAddPayout(update, env);
     }
 
-    if (update.message?.text === "/cabinet") {
-      await sendUserCabinet(update, env);
-    }
-
     if (update.message?.text === "/admin") {
+      await claimOwnerIfNeeded(env, update.message.from.id);
       if (await adminIsAllowed(env, update.message.from.id)) {
         await sendMessage(env.BOT_TOKEN, update.message.chat.id, "Админ кабинет", adminKeyboard());
+      } else {
+        await sendMessage(
+          env.BOT_TOKEN,
+          update.message.chat.id,
+          "У тебя нет доступа к админ-кабинету."
+        );
       }
     }
 

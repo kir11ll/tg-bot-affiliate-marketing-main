@@ -314,6 +314,7 @@ async function buildReferralCard(env, user) {
 }
 
 async function sendUserCabinet(update, env) {
+  await ensureUser(env, update.message.from);
   const cab = await buildUserCabinet(env, update.message.from);
   await sendMessage(env.BOT_TOKEN, update.message.chat.id, cab.text, cab.keyboard);
 }
@@ -405,138 +406,162 @@ async function handleCallback(update, env) {
   const user = update.callback_query?.from;
   const chatId = update.callback_query?.message?.chat?.id;
   if (!user || !chatId) return;
-
-  if (data === "subscribed") {
-    const subscription = await isSubscribed(env.BOT_TOKEN, env.PUBLIC_CHANNEL, user.id);
-    if (typeof subscription === "object" && subscription.ok === false) {
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        `Не могу проверить подписку на канал.\n\nПричина: ${subscription.error}`
-      );
-    } else if (subscription) {
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        "Подписка подтверждена. Вот статья:\n\nВремя на чтение 5-8 минут",
-        articleKeyboard(env.ARTICLE_URL)
-      );
-    } else {
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        "К сожалению, не увидил подписки на канал @khak_partners\n\nПерепроверь подписку и нажми на кнопку подписался, сразу после отправлю статью!",
-        { inline_keyboard: [[{ text: "Подписался", callback_data: "subscribed" }]] }
-      );
+  try {
+    if (data === "subscribed") {
+      const subscription = await isSubscribed(env.BOT_TOKEN, env.PUBLIC_CHANNEL, user.id);
+      if (typeof subscription === "object" && subscription.ok === false) {
+        await sendMessage(
+          env.BOT_TOKEN,
+          chatId,
+          `Не могу проверить подписку на канал.\n\nПричина: ${subscription.error}`
+        );
+      } else if (subscription) {
+        await sendMessage(
+          env.BOT_TOKEN,
+          chatId,
+          "Подписка подтверждена. Вот статья:\n\nВремя на чтение 5-8 минут",
+          articleKeyboard(env.ARTICLE_URL)
+        );
+      } else {
+        await sendMessage(
+          env.BOT_TOKEN,
+          chatId,
+          "К сожалению, не увидил подписки на канал @khak_partners\n\nПерепроверь подписку и нажми на кнопку подписался, сразу после отправлю статью!",
+          { inline_keyboard: [[{ text: "Подписался", callback_data: "subscribed" }]] }
+        );
+      }
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+        text: "Проверяю подписку",
+      });
+      return;
     }
-    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-      callback_query_id: update.callback_query.id,
-      text: "Проверяю подписку",
-    });
-    return;
-  }
 
-  if (data === "cabinet:stats") {
-    const cab = await buildUserCabinet(env, user);
-    await sendMessage(env.BOT_TOKEN, chatId, cab.text, cab.keyboard);
-    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-      callback_query_id: update.callback_query.id,
-    });
-    return;
-  }
-
-  if (data === "cabinet:withdraw") {
-    const me = await getUserByTgId(env, user.id);
-    if ((me.balance || 0) < MIN_WITHDRAWAL) {
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        `Вывод доступен от ${formatMoney(MIN_WITHDRAWAL)}.\nВаш баланс: ${formatMoney(me.balance || 0)}`
-      );
-    } else {
-      await addPayoutRequest(env, user.id, me.balance || 0);
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        `Заявка на вывод создана на сумму ${formatMoney(me.balance || 0)}.\nАдминистратор обработает её вручную.`
-      );
+    if (data === "cabinet:stats") {
+      const cab = await buildUserCabinet(env, user);
+      await sendMessage(env.BOT_TOKEN, chatId, cab.text, cab.keyboard);
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+      });
+      return;
     }
-    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-      callback_query_id: update.callback_query.id,
-    });
-    return;
-  }
+
+    if (data === "cabinet:withdraw") {
+      const me = await getUserByTgId(env, user.id);
+      if ((me.balance || 0) < MIN_WITHDRAWAL) {
+        await sendMessage(
+          env.BOT_TOKEN,
+          chatId,
+          `Вывод доступен от ${formatMoney(MIN_WITHDRAWAL)}.\nВаш баланс: ${formatMoney(me.balance || 0)}`
+        );
+      } else {
+        await addPayoutRequest(env, user.id, me.balance || 0);
+        await sendMessage(
+          env.BOT_TOKEN,
+          chatId,
+          `Заявка на вывод создана на сумму ${formatMoney(me.balance || 0)}.\nАдминистратор обработает её вручную.`
+        );
+      }
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+      });
+      return;
+    }
 
     if (data === "admin:stats") {
-    if (!(await adminIsAllowed(env, user.id))) return;
-    await sendAdminStats(update, env);
-    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-      callback_query_id: update.callback_query.id,
-    });
-    return;
-  }
+      if (!(await adminIsAllowed(env, user.id))) {
+        await sendMessage(env.BOT_TOKEN, chatId, "У тебя нет доступа к админ-кабинету.");
+        return;
+      }
+      await sendAdminStats(update, env);
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+      });
+      return;
+    }
 
     if (data === "admin:refs") {
-    if (!(await adminIsAllowed(env, user.id))) return;
-    await sendAdminRefs(update, env);
-    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-      callback_query_id: update.callback_query.id,
-    });
-    return;
-  }
+      if (!(await adminIsAllowed(env, user.id))) {
+        await sendMessage(env.BOT_TOKEN, chatId, "У тебя нет доступа к админ-кабинету.");
+        return;
+      }
+      await sendAdminRefs(update, env);
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+      });
+      return;
+    }
 
     if (data === "admin:notify") {
-    if (!(await adminIsAllowed(env, user.id))) return;
-    const enabled = (await dbOne(env, "SELECT value FROM settings WHERE key = 'notify_enabled'"))?.value === "1";
-    await dbRun(env, "INSERT OR REPLACE INTO settings (key, value) VALUES ('notify_enabled', ?)", [enabled ? "0" : "1"]);
-    await sendMessage(
-      env.BOT_TOKEN,
-      chatId,
-      `Уведомления ${enabled ? "выключены" : "включены"}`
-    );
-    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-      callback_query_id: update.callback_query.id,
-    });
-    return;
-  }
+      if (!(await adminIsAllowed(env, user.id))) {
+        await sendMessage(env.BOT_TOKEN, chatId, "У тебя нет доступа к админ-кабинету.");
+        return;
+      }
+      const enabled = (await dbOne(env, "SELECT value FROM settings WHERE key = 'notify_enabled'"))?.value === "1";
+      await dbRun(env, "INSERT OR REPLACE INTO settings (key, value) VALUES ('notify_enabled', ?)", [enabled ? "0" : "1"]);
+      await sendMessage(
+        env.BOT_TOKEN,
+        chatId,
+        `Уведомления ${enabled ? "выключены" : "включены"}`
+      );
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+      });
+      return;
+    }
 
-  if (data === "admin:home") {
-    if (!(await adminIsAllowed(env, user.id))) return;
-    await sendMessage(env.BOT_TOKEN, chatId, "Админ кабинет", adminKeyboard());
-    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-      callback_query_id: update.callback_query.id,
-    });
-    return;
-  }
+    if (data === "admin:home") {
+      if (!(await adminIsAllowed(env, user.id))) {
+        await sendMessage(env.BOT_TOKEN, chatId, "У тебя нет доступа к админ-кабинету.");
+        return;
+      }
+      await sendMessage(env.BOT_TOKEN, chatId, "Админ кабинет", adminKeyboard());
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+      });
+      return;
+    }
 
-  if (data === "admin:search") {
-    if (!(await adminIsAllowed(env, user.id))) return;
-    await setAdminState(env, user.id, "await_search", "1");
-    await sendMessage(
-      env.BOT_TOKEN,
-      chatId,
-      "Отправь ID, username или реферальный код пользователя.\n\nПример: 123456789 или @nickname или u123456789"
-    );
-    await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
-      callback_query_id: update.callback_query.id,
-    });
-    return;
-  }
+    if (data === "admin:search") {
+      if (!(await adminIsAllowed(env, user.id))) {
+        await sendMessage(env.BOT_TOKEN, chatId, "У тебя нет доступа к админ-кабинету.");
+        return;
+      }
+      await setAdminState(env, user.id, "await_search", "1");
+      await sendMessage(
+        env.BOT_TOKEN,
+        chatId,
+        "Отправь ID, username или реферальный код пользователя.\n\nПример: 123456789 или @nickname или u123456789"
+      );
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+      });
+      return;
+    }
 
-  if (data.startsWith("admin:payout:")) {
-    if (!(await adminIsAllowed(env, user.id))) return;
-    const targetId = Number(data.split(":")[2]);
-    if (!targetId) return;
-    await setAdminState(env, user.id, "await_payout_user", String(targetId));
-    await sendMessage(
-      env.BOT_TOKEN,
-      chatId,
-      `Введи сумму выплаты для пользователя ${targetId}.\nФормат: 1500`
-    );
+    if (data.startsWith("admin:payout:")) {
+      if (!(await adminIsAllowed(env, user.id))) {
+        await sendMessage(env.BOT_TOKEN, chatId, "У тебя нет доступа к админ-кабинету.");
+        return;
+      }
+      const targetId = Number(data.split(":")[2]);
+      if (!targetId) return;
+      await setAdminState(env, user.id, "await_payout_user", String(targetId));
+      await sendMessage(
+        env.BOT_TOKEN,
+        chatId,
+        `Введи сумму выплаты для пользователя ${targetId}.\nФормат: 1500`
+      );
+      await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
+        callback_query_id: update.callback_query.id,
+      });
+      return;
+    }
+  } catch (error) {
+    await sendMessage(env.BOT_TOKEN, chatId, `Ошибка в кнопке: ${error.message}`);
     await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
       callback_query_id: update.callback_query.id,
     });
-    return;
   }
 }
 

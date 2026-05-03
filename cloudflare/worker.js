@@ -275,7 +275,7 @@ async function buildAdminStats(env) {
 async function buildAdminRefs(env) {
   const rows = await dbAll(
     env,
-    "SELECT tg_id, username, first_name, referral_code, balance, payouts_total, ref_clicks, referred_sales, withdrawal_requests FROM users ORDER BY balance DESC LIMIT 20"
+    "SELECT u.tg_id, u.username, u.first_name, u.referral_code, u.balance, u.payouts_total, u.ref_clicks, u.referred_sales, u.withdrawal_requests, COALESCE(SUM(p.amount), 0) AS revenue FROM users u LEFT JOIN payments p ON p.referrer_id = u.tg_id AND p.status = 'paid' GROUP BY u.tg_id ORDER BY revenue DESC, u.balance DESC LIMIT 20"
   );
   const text = ["<b>Рефералы</b>"];
   for (const row of rows.results || []) {
@@ -284,6 +284,7 @@ async function buildAdminRefs(env) {
         `\nID: ${row.tg_id}` +
         `\nКод: ${row.referral_code || ""}` +
         `\nПереходы: ${row.ref_clicks || 0}` +
+        `\nВыручка: ${formatMoney(row.revenue || 0)}` +
         `\nБаланс: ${formatMoney(row.balance || 0)}` +
         `\nВыплачено: ${formatMoney(row.payouts_total || 0)}` +
         `\nВыводы: ${row.withdrawal_requests || 0}`
@@ -309,6 +310,11 @@ async function buildReferralCard(env, user) {
   const code = user.referral_code || `u${user.tg_id}`;
   const botUsername = await getBotUsername(env);
   const link = referralLink(botUsername, code);
+  const revenueRow = await dbOne(
+    env,
+    "SELECT COALESCE(SUM(amount), 0) AS revenue FROM payments WHERE referrer_id = ? AND status = 'paid'",
+    [user.tg_id]
+  );
   return {
     text:
       `<b>Реферал</b>\n\n` +
@@ -318,6 +324,7 @@ async function buildReferralCard(env, user) {
       `Код: ${htmlEscape(code)}\n` +
       `Ссылка: ${htmlEscape(link)}\n` +
       `Переходы: ${user.ref_clicks || 0}\n` +
+      `Выручка: ${formatMoney(revenueRow?.revenue || 0)}\n` +
       `Продажи: ${user.referred_sales || 0}\n` +
       `Баланс выплат: ${formatMoney(user.balance || 0)}\n` +
       `Выплачено: ${formatMoney(user.payouts_total || 0)}\n` +

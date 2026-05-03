@@ -332,14 +332,14 @@ async function sendUserCabinet(update, env) {
   await sendMessage(env.BOT_TOKEN, update.message.chat.id, cab.text, cab.keyboard);
 }
 
-async function sendAdminStats(update, env) {
+async function sendAdminStats(chatId, env) {
   const payload = await buildAdminStats(env);
-  await sendMessage(env.BOT_TOKEN, update.message.chat.id, payload.text, payload.keyboard);
+  await sendMessage(env.BOT_TOKEN, chatId, payload.text, payload.keyboard);
 }
 
-async function sendAdminRefs(update, env) {
+async function sendAdminRefs(chatId, env) {
   const payload = await buildAdminRefs(env);
-  await sendMessage(env.BOT_TOKEN, update.message.chat.id, payload.text, payload.keyboard);
+  await sendMessage(env.BOT_TOKEN, chatId, payload.text, payload.keyboard);
 }
 
 async function handleStart(update, env) {
@@ -486,7 +486,7 @@ async function handleCallback(update, env) {
         await sendMessage(env.BOT_TOKEN, chatId, "У тебя нет доступа к админ-кабинету.");
         return;
       }
-      await sendAdminStats(update, env);
+      await sendAdminStats(chatId, env);
       await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
         callback_query_id: update.callback_query.id,
       });
@@ -498,7 +498,7 @@ async function handleCallback(update, env) {
         await sendMessage(env.BOT_TOKEN, chatId, "У тебя нет доступа к админ-кабинету.");
         return;
       }
-      await sendAdminRefs(update, env);
+      await sendAdminRefs(chatId, env);
       await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
         callback_query_id: update.callback_query.id,
       });

@@ -236,7 +236,7 @@ async function buildUserCabinet(env, tgUser) {
   return {
     text:
       `Ваш реферальный кабинет\n\n` +
-      `Ссылка: ${link}\n` +
+      `Реферальная ссылка: ${link}\n` +
       `Переходы: ${user.ref_clicks || 0}\n` +
       `Вознаграждение за оплаты: ${formatMoney(user.balance || 0)}\n` +
       `Запрос на вывод: ${user.withdrawal_requests || 0}\n\n` +
@@ -290,6 +290,19 @@ async function buildAdminRefs(env) {
     );
   }
   return { text: text.join("\n"), keyboard: adminKeyboard() };
+}
+
+async function buildAdminNotify(env) {
+  const enabled = (await dbOne(env, "SELECT value FROM settings WHERE key = 'notify_enabled'"))?.value === "1";
+  return {
+    text: `Уведомления сейчас ${enabled ? "включены" : "выключены"}`,
+    keyboard: {
+      inline_keyboard: [
+        [{ text: enabled ? "Выключить уведомления" : "Включить уведомления", callback_data: "admin:notify" }],
+        [{ text: "Назад", callback_data: "admin:home" }],
+      ],
+    },
+  };
 }
 
 async function buildReferralCard(env, user) {
@@ -499,11 +512,8 @@ async function handleCallback(update, env) {
       }
       const enabled = (await dbOne(env, "SELECT value FROM settings WHERE key = 'notify_enabled'"))?.value === "1";
       await dbRun(env, "INSERT OR REPLACE INTO settings (key, value) VALUES ('notify_enabled', ?)", [enabled ? "0" : "1"]);
-      await sendMessage(
-        env.BOT_TOKEN,
-        chatId,
-        `Уведомления ${enabled ? "выключены" : "включены"}`
-      );
+      const payload = await buildAdminNotify(env);
+      await sendMessage(env.BOT_TOKEN, chatId, payload.text, payload.keyboard);
       await telegramRequest(env.BOT_TOKEN, "answerCallbackQuery", {
         callback_query_id: update.callback_query.id,
       });

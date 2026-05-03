@@ -560,7 +560,7 @@ async function handleStart(update, env) {
   }
 
   if (payload === "from_article") {
-    await sendPaymentPost(env, chatId, user.id);
+    await sendFollowupPost(env, chatId, user.id);
     return;
   }
 

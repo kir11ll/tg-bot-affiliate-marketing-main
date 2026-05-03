@@ -12,3 +12,9 @@ PUBLIC_CHANNEL = "@khak_partners"
 ARTICLE_URL = "https://teletype.in/@mecrover/bqHiwYN2dN4"
 PRIVATE_CHANNEL_ID = "-1002898523330"
 PAYMENT_URL = "https://example.com/pay"
+SCREENSHOT_1_URL = "https://example.com/screenshot-1.jpg"
+SCREENSHOT_2_URL = "https://example.com/screenshot-2.jpg"
+SCREENSHOT_3_URL = "https://example.com/screenshot-3.jpg"
+
+[triggers]
+crons = ["*/5 * * * *"]

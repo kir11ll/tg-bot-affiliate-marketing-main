@@ -242,6 +242,39 @@ async function buildRobokassaPaymentUrl(env, userId, amount, description) {
   };
 }
 
+async function buildRobokassaDebug(env, userId, amount, description) {
+  const payment = await buildRobokassaPaymentUrl(env, userId, amount, description);
+  const rows = Object.entries(payment.fields)
+    .map(([key, value]) => `<tr><td><b>${htmlEscape(key)}</b></td><td>${htmlEscape(value)}</td></tr>`)
+    .join("");
+  return `<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Robokassa debug</title>
+    <style>
+      body { font-family: system-ui, sans-serif; padding: 24px; background:#111827; color:#fff; }
+      table { border-collapse: collapse; width: 100%; max-width: 980px; }
+      td { border: 1px solid #374151; padding: 8px 10px; vertical-align: top; }
+      pre { white-space: pre-wrap; word-break: break-word; background:#0b1220; padding: 12px; border-radius: 8px; }
+      .box { max-width: 980px; }
+      .btn { display:inline-block; margin-top:16px; padding:12px 18px; background:#2563eb; color:#fff; text-decoration:none; border-radius:8px; }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <h1>Robokassa debug</h1>
+      <p>Ниже поля, которые уходят в форму оплаты.</p>
+      <p><b>Action URL:</b> ${htmlEscape(payment.actionUrl)}</p>
+      <p><b>Signature base:</b> ${htmlEscape(`${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${payment.fields.InvId}:${env.ROBOKASSA_PASSWORD_1}:Shp_user_id=${userId}`)}</p>
+      <table>${rows}</table>
+      <a class="btn" href="/pay?user_id=${encodeURIComponent(userId)}">Перейти к оплате</a>
+    </div>
+  </body>
+</html>`;
+}
+
 function buildPaymentEntryUrl(env, userId) {
   const base = env.WORKER_URL || "";
   if (!base) return env.PAYMENT_URL || "/pay";
@@ -1238,9 +1271,23 @@ export default {
         return json({ ok: true, service: "tg-bot-dozmobot" });
       }
       if (url.pathname === "/pay") {
+        const userId = url.searchParams.get("user_id") || 0;
+        if (url.searchParams.get("debug") === "1") {
+          return new Response(
+            await buildRobokassaDebug(
+              env,
+              userId,
+              PRODUCT_PRICE,
+              "Доступ к методике партнерского маркетинга"
+            ),
+            {
+              headers: { "content-type": "text/html; charset=utf-8" },
+            }
+          );
+        }
         const payment = await buildRobokassaPaymentUrl(
           env,
-          url.searchParams.get("user_id") || 0,
+          userId,
           PRODUCT_PRICE,
           "Доступ к методике партнерского маркетинга"
         );

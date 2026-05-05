@@ -238,7 +238,6 @@ async function buildRobokassaPaymentUrl(env, userId, amount, description) {
       SignatureValue: signature,
       IsTest: env.ROBOKASSA_TEST_MODE || "1",
       Culture: "ru",
-      ResultUrl: env.ROBOKASSA_RESULT_URL || `${env.WORKER_URL || ""}/robokassa/result`,
     },
   };
 }

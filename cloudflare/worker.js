@@ -59,7 +59,7 @@ function methodKeyboard() {
 }
 
 function paymentKeyboard(paymentUrl) {
-  return { inline_keyboard: [[{ text: "Оплатить доступ", url: paymentUrl }]] };
+  return { inline_keyboard: [[{ text: "Получить доступ", url: paymentUrl }]] };
 }
 
 function reminder1Keyboard(paymentUrl) {
@@ -68,6 +68,99 @@ function reminder1Keyboard(paymentUrl) {
 
 function reminder2Keyboard(paymentUrl) {
   return { inline_keyboard: [[{ text: "Получить методику", url: paymentUrl }]] };
+}
+
+function robokassaFormHtml(actionUrl, fields) {
+  const inputs = Object.entries(fields)
+    .map(
+      ([name, value]) =>
+        `<input type="hidden" name="${htmlEscape(name)}" value="${htmlEscape(value)}">`
+    )
+    .join("");
+  return `<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Оплата</title>
+  </head>
+  <body>
+    <form id="payForm" action="${htmlEscape(actionUrl)}" method="post">
+      ${inputs}
+      <noscript>
+        <button type="submit">Перейти к оплате</button>
+      </noscript>
+    </form>
+    <script>
+      document.getElementById('payForm').submit();
+    </script>
+  </body>
+</html>`;
+}
+
+function formValue(formData, key) {
+  const value = formData.get(key);
+  return value === null ? "" : String(value);
+}
+
+async function sha256Hex(text) {
+  const data = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function buildRobokassaPaymentUrl(env, userId, amount, description) {
+  if (!env.ROBOKASSA_MERCHANT_LOGIN || !env.ROBOKASSA_PASSWORD_1 || !env.ROBOKASSA_PAYMENT_URL) {
+    throw new Error("Robokassa is not configured");
+  }
+
+  const invId = `${Date.now()}_${userId}`;
+  const signature = await sha256Hex(
+    `${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${invId}:${env.ROBOKASSA_PASSWORD_1}`
+  );
+
+  const params = new URLSearchParams({
+    MerchantLogin: env.ROBOKASSA_MERCHANT_LOGIN,
+    OutSum: String(amount),
+    InvId: invId,
+    Description: description,
+    SignatureValue: signature.toUpperCase(),
+    IsTest: env.ROBOKASSA_TEST_MODE || "1",
+    Culture: "ru",
+  });
+
+  return `${env.ROBOKASSA_PAYMENT_URL}?${params.toString()}`;
+}
+
+async function robokassaResultResponse(request, env) {
+  const contentType = request.headers.get("content-type") || "";
+  let payload;
+  if (contentType.includes("application/json")) {
+    payload = await request.json();
+  } else {
+    const body = await request.text();
+    payload = Object.fromEntries(new URLSearchParams(body));
+  }
+
+  const outSum = formValue(new URLSearchParams(payload), "OutSum");
+  const invId = formValue(new URLSearchParams(payload), "InvId");
+  const signatureValue = formValue(new URLSearchParams(payload), "SignatureValue").toUpperCase();
+  const expected = (await sha256Hex(`${outSum}:${invId}:${env.ROBOKASSA_PASSWORD_2}`)).toUpperCase();
+
+  if (!outSum || !invId || signatureValue !== expected) {
+    return new Response("bad sign", { status: 400 });
+  }
+
+  const stage = await dbOne(env, "SELECT * FROM content_stages WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", [Number(String(invId).split("_").pop())]);
+  if (stage && !stage.payment_completed_at) {
+    await upsertContentStage(env, stage.user_id, "payment_completed", {
+      payment_completed_at: new Date().toISOString(),
+    });
+  }
+
+  return new Response(`OK${invId}`, { status: 200 });
 }
 
 function sendPlaceholdersIfMissing(env) {
@@ -285,9 +378,7 @@ async function sendFollowupPost(env, chatId, userId) {
     chatId,
     message +
       "\n\n" +
-      "Чтобы продолжить, нажми кнопку ниже 👇\n\n" +
-      "<b>ОЧЕНЬ ВАЖНО придерживаться каждого шага стратегии!</b>\n\n" +
-      "Получай методику по кнопке под этим сообщением.",
+      "<b>ОЧЕНЬ ВАЖНО придерживаться каждого шага стратегии!</b>",
     followupKeyboard()
   );
   await upsertContentStage(env, userId, "followup_sent", { followup_sent_at: new Date().toISOString() });
@@ -301,7 +392,7 @@ async function sendMethodPost(env, chatId, userId) {
     "<b>И самое главное:</b> Мои видео, которые приносят мне 300к рублей продаж ежемесячно. Ну и конечно, сами партнерские продукты тоже прилагаются, как же без них)\n\n" +
     "<b>Просто переходи по ссылке ниже и забирай базу + полную стратегию по Партнерскому маркетингу для выхода на 100к+ в месяц</b>";
 
-  await sendMessage(env.BOT_TOKEN, chatId, message, paymentKeyboard(env.PAYMENT_URL || "https://example.com/pay"));
+  await sendMessage(env.BOT_TOKEN, chatId, message, paymentKeyboard(env.PAYMENT_URL || "/pay"));
   await upsertContentStage(env, userId, "method_sent", {});
 }
 
@@ -328,7 +419,7 @@ async function sendPaymentPost(env, chatId, userId) {
     "<b>Только в течение 24 часов всю методику + базу с видео не за 4990, а за 1490 рублей!</b>\n\n" +
     "<b>Все это уже ждет внутри.\nЖми кнопку ниже и забирай👇</b>";
 
-  await sendMessage(env.BOT_TOKEN, chatId, message, paymentKeyboard(env.PAYMENT_URL || "https://example.com/pay"));
+  await sendMessage(env.BOT_TOKEN, chatId, message, paymentKeyboard(env.PAYMENT_URL || "/pay"));
   await upsertContentStage(env, userId, "payment_sent", { payment_sent_at: new Date().toISOString() });
 }
 
@@ -341,7 +432,7 @@ async function sendPaymentReminder1(env, chatId, userId) {
     "Если бы тебе предложили вложить 1490 рублей и сказали, что через месяц они превратятся в 100 тысяч рублей, согласился бы? - Задумайся над этим\n\n" +
     "Заверши начатое по ссылке 👇";
 
-  await sendMessage(env.BOT_TOKEN, chatId, message, reminder1Keyboard(env.PAYMENT_URL || "https://example.com/pay"));
+  await sendMessage(env.BOT_TOKEN, chatId, message, reminder1Keyboard(env.PAYMENT_URL || "/pay"));
   await upsertContentStage(env, userId, "payment_reminder1_sent", {
     payment_reminder1_at: new Date().toISOString(),
   });
@@ -367,7 +458,7 @@ async function sendPaymentReminder2(env, chatId, userId) {
     env.BOT_TOKEN,
     chatId,
     message,
-    reminder2Keyboard(env.PAYMENT_URL || "https://example.com/pay")
+    reminder2Keyboard(env.PAYMENT_URL || "/pay")
   );
   if (env.SCREENSHOT_4_URL) {
     try {
@@ -1015,8 +1106,23 @@ export default {
     await ensureSchema(env);
 
     if (request.method === "GET") {
-      if (new URL(request.url).pathname === "/health") {
+      const url = new URL(request.url);
+      if (url.pathname === "/health") {
         return json({ ok: true, service: "tg-bot-dozmobot" });
+      }
+      if (url.pathname === "/pay") {
+        const paymentUrl = await buildRobokassaPaymentUrl(
+          env,
+          url.searchParams.get("user_id") || 0,
+          1490,
+          "Доступ к методике партнерского маркетинга"
+        );
+        return new Response(robokassaFormHtml(paymentUrl, {}), {
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      }
+      if (url.pathname === "/robokassa/result") {
+        return json({ ok: true, message: "Use POST for ResultURL" });
       }
       if (env.BOT_TOKEN) {
         const info = await webhookInfo(env.BOT_TOKEN);
@@ -1026,6 +1132,11 @@ export default {
     }
 
     if (request.method !== "POST") return json({ ok: true });
+
+    const url = new URL(request.url);
+    if (url.pathname === "/robokassa/result") {
+      return robokassaResultResponse(request, env);
+    }
 
     const update = await request.json();
 

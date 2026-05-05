@@ -225,7 +225,7 @@ async function buildRobokassaPaymentUrl(env, userId, amount, description) {
 
   const invId = String(Date.now());
   const signature = md5(
-    `${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${invId}:Shp_user_id=${userId}:${env.ROBOKASSA_PASSWORD_1}`
+    `${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${invId}:${env.ROBOKASSA_PASSWORD_1}:Shp_user_id=${userId}`
   );
   return {
     actionUrl: env.ROBOKASSA_PAYMENT_URL,
@@ -264,7 +264,7 @@ async function robokassaResultResponse(request, env) {
   const invId = formValue(new URLSearchParams(payload), "InvId");
   const signatureValue = formValue(new URLSearchParams(payload), "SignatureValue").toUpperCase();
   const shpUserId = formValue(new URLSearchParams(payload), "Shp_user_id");
-  const expected = md5(`${outSum}:${invId}:Shp_user_id=${shpUserId}:${env.ROBOKASSA_PASSWORD_2}`);
+  const expected = md5(`${outSum}:${invId}:${env.ROBOKASSA_PASSWORD_2}:Shp_user_id=${shpUserId}`);
 
   if (!outSum || !invId || signatureValue !== expected.toUpperCase()) {
     return new Response("bad sign", { status: 400 });

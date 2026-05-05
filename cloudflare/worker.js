@@ -274,9 +274,10 @@ async function buildRobokassaDebug(env, userId, invId, amount, description) {
 }
 
 function buildPaymentEntryUrl(env, userId) {
-  const base = env.WORKER_URL || "";
-  if (!base) return env.PAYMENT_URL || "/pay";
-  const url = new URL(env.PAYMENT_URL || "/pay", base);
+  const paymentBase = env.PAYMENT_URL || "/pay";
+  const url = paymentBase.startsWith("http")
+    ? new URL(paymentBase)
+    : new URL(paymentBase, "https://tg-bot-dozmobot.haravinkink.workers.dev");
   url.searchParams.set("user_id", String(userId));
   return url.toString();
 }
@@ -1275,7 +1276,10 @@ export default {
       if (url.pathname === "/pay") {
         const userId = Number(url.searchParams.get("user_id") || 0);
         if (!userId) {
-          return json({ ok: false, error: "user_id required" }, 400);
+          return new Response(
+            `<!doctype html><html><body><h3>user_id required</h3><p>Открой оплату из бота, а не напрямую.</p></body></html>`,
+            { headers: { "content-type": "text/html; charset=utf-8" }, status: 400 }
+          );
         }
         const invId = String(Date.now());
         await dbRun(env, "INSERT OR REPLACE INTO payment_requests (inv_id, user_id, amount, created_at, status) VALUES (?, ?, ?, ?, ?)", [

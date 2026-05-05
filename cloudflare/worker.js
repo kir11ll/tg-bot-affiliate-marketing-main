@@ -223,9 +223,9 @@ async function buildRobokassaPaymentUrl(env, userId, amount, description) {
     throw new Error("Robokassa is not configured");
   }
 
-  const invId = `${Date.now()}_${userId}`;
+  const invId = String(Date.now());
   const signature = md5(
-    `${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${invId}:${env.ROBOKASSA_PASSWORD_1}`
+    `${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${invId}:Shp_user_id=${userId}:${env.ROBOKASSA_PASSWORD_1}`
   );
   return {
     actionUrl: env.ROBOKASSA_PAYMENT_URL,
@@ -234,6 +234,7 @@ async function buildRobokassaPaymentUrl(env, userId, amount, description) {
       OutSum: String(amount),
       InvId: invId,
       Description: description,
+      Shp_user_id: String(userId),
       SignatureValue: signature,
       IsTest: env.ROBOKASSA_TEST_MODE || "1",
       Culture: "ru",
@@ -262,13 +263,14 @@ async function robokassaResultResponse(request, env) {
   const outSum = formValue(new URLSearchParams(payload), "OutSum");
   const invId = formValue(new URLSearchParams(payload), "InvId");
   const signatureValue = formValue(new URLSearchParams(payload), "SignatureValue").toUpperCase();
-  const expected = md5(`${outSum}:${invId}:${env.ROBOKASSA_PASSWORD_2}`);
+  const shpUserId = formValue(new URLSearchParams(payload), "Shp_user_id");
+  const expected = md5(`${outSum}:${invId}:Shp_user_id=${shpUserId}:${env.ROBOKASSA_PASSWORD_2}`);
 
   if (!outSum || !invId || signatureValue !== expected.toUpperCase()) {
     return new Response("bad sign", { status: 400 });
   }
 
-  const userId = Number(String(invId).split("_").pop());
+  const userId = Number(shpUserId || 0);
   const stage = await dbOne(env, "SELECT * FROM content_stages WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", [userId]);
   if (stage && !stage.payment_completed_at) {
     await upsertContentStage(env, stage.user_id, "payment_completed", {

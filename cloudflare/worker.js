@@ -555,12 +555,24 @@ async function handleStart(update, env) {
 
   const payload = (update.message?.text || "").split(" ")[1] || "";
   await createReferralIfNeeded(env, user, payload);
-  const isAdmin = await adminIsAllowed(env, user.id);
 
   if (payload === "partner" || payload === "cabinet") {
     await sendUserCabinet(update, env);
     return;
   }
+
+  if (payload === "from_article") {
+    await sendFollowupPost(env, chatId, user.id);
+    return;
+  }
+
+  const stage = await getContentStage(env, user.id);
+  if (!payload && stage?.stage === "article_sent" && !stage?.followup_sent_at) {
+    await sendFollowupPost(env, chatId, user.id);
+    return;
+  }
+
+  const isAdmin = await adminIsAllowed(env, user.id);
 
   if (isAdmin) {
     await sendMessage(
@@ -569,11 +581,6 @@ async function handleStart(update, env) {
       "Админ кабинет",
       adminKeyboard()
     );
-    return;
-  }
-
-  if (payload === "from_article") {
-    await sendFollowupPost(env, chatId, user.id);
     return;
   }
 

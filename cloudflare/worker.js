@@ -103,12 +103,118 @@ function formValue(formData, key) {
   return value === null ? "" : String(value);
 }
 
-async function sha256Hex(text) {
-  const data = new TextEncoder().encode(text);
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+function md5(input) {
+  function cmn(q, a, b, x, s, t) {
+    a = (a + q + x + t) | 0;
+    return (((a << s) | (a >>> (32 - s))) + b) | 0;
+  }
+  function ff(a, b, c, d, x, s, t) {
+    return cmn((b & c) | (~b & d), a, b, x, s, t);
+  }
+  function gg(a, b, c, d, x, s, t) {
+    return cmn((b & d) | (c & ~d), a, b, x, s, t);
+  }
+  function hh(a, b, c, d, x, s, t) {
+    return cmn(b ^ c ^ d, a, b, x, s, t);
+  }
+  function ii(a, b, c, d, x, s, t) {
+    return cmn(c ^ (b | ~d), a, b, x, s, t);
+  }
+  function toWords(str) {
+    const n = str.length;
+    const words = [];
+    for (let i = 0; i < n; i++) {
+      words[i >> 2] |= str.charCodeAt(i) << ((i % 4) << 3);
+    }
+    words[n >> 2] |= 0x80 << ((n % 4) << 3);
+    words[(((n + 8) >> 6) + 1) * 16 - 2] = n * 8;
+    return words;
+  }
+  function toHex(num) {
+    let out = "";
+    for (let i = 0; i < 4; i++) out += ((num >> (i * 8)) & 0xff).toString(16).padStart(2, "0");
+    return out;
+  }
+  const x = toWords(unescape(encodeURIComponent(input)));
+  let a = 0x67452301;
+  let b = 0xefcdab89;
+  let c = 0x98badcfe;
+  let d = 0x10325476;
+  for (let i = 0; i < x.length; i += 16) {
+    const oa = a;
+    const ob = b;
+    const oc = c;
+    const od = d;
+    a = ff(a, b, c, d, x[i + 0] || 0, 7, -680876936);
+    d = ff(d, a, b, c, x[i + 1] || 0, 12, -389564586);
+    c = ff(c, d, a, b, x[i + 2] || 0, 17, 606105819);
+    b = ff(b, c, d, a, x[i + 3] || 0, 22, -1044525330);
+    a = ff(a, b, c, d, x[i + 4] || 0, 7, -176418897);
+    d = ff(d, a, b, c, x[i + 5] || 0, 12, 1200080426);
+    c = ff(c, d, a, b, x[i + 6] || 0, 17, -1473231341);
+    b = ff(b, c, d, a, x[i + 7] || 0, 22, -45705983);
+    a = ff(a, b, c, d, x[i + 8] || 0, 7, 1770035416);
+    d = ff(d, a, b, c, x[i + 9] || 0, 12, -1958414417);
+    c = ff(c, d, a, b, x[i + 10] || 0, 17, -42063);
+    b = ff(b, c, d, a, x[i + 11] || 0, 22, -1990404162);
+    a = ff(a, b, c, d, x[i + 12] || 0, 7, 1804603682);
+    d = ff(d, a, b, c, x[i + 13] || 0, 12, -40341101);
+    c = ff(c, d, a, b, x[i + 14] || 0, 17, -1502002290);
+    b = ff(b, c, d, a, x[i + 15] || 0, 22, 1236535329);
+    a = gg(a, b, c, d, x[i + 1] || 0, 5, -165796510);
+    d = gg(d, a, b, c, x[i + 6] || 0, 9, -1069501632);
+    c = gg(c, d, a, b, x[i + 11] || 0, 14, 643717713);
+    b = gg(b, c, d, a, x[i + 0] || 0, 20, -373897302);
+    a = gg(a, b, c, d, x[i + 5] || 0, 5, -701558691);
+    d = gg(d, a, b, c, x[i + 10] || 0, 9, 38016083);
+    c = gg(c, d, a, b, x[i + 15] || 0, 14, -660478335);
+    b = gg(b, c, d, a, x[i + 4] || 0, 20, -405537848);
+    a = gg(a, b, c, d, x[i + 9] || 0, 5, 568446438);
+    d = gg(d, a, b, c, x[i + 14] || 0, 9, -1019803690);
+    c = gg(c, d, a, b, x[i + 3] || 0, 14, -187363961);
+    b = gg(b, c, d, a, x[i + 8] || 0, 20, 1163531501);
+    a = gg(a, b, c, d, x[i + 13] || 0, 5, -1444681467);
+    d = gg(d, a, b, c, x[i + 2] || 0, 9, -51403784);
+    c = gg(c, d, a, b, x[i + 7] || 0, 14, 1735328473);
+    b = gg(b, c, d, a, x[i + 12] || 0, 20, -1926607734);
+    a = hh(a, b, c, d, x[i + 5] || 0, 4, -378558);
+    d = hh(d, a, b, c, x[i + 8] || 0, 11, -2022574463);
+    c = hh(c, d, a, b, x[i + 11] || 0, 16, 1839030562);
+    b = hh(b, c, d, a, x[i + 14] || 0, 23, -35309556);
+    a = hh(a, b, c, d, x[i + 1] || 0, 4, -1530992060);
+    d = hh(d, a, b, c, x[i + 4] || 0, 11, 1272893353);
+    c = hh(c, d, a, b, x[i + 7] || 0, 16, -155497632);
+    b = hh(b, c, d, a, x[i + 10] || 0, 23, -1094730640);
+    a = hh(a, b, c, d, x[i + 13] || 0, 4, 681279174);
+    d = hh(d, a, b, c, x[i + 0] || 0, 11, -358537222);
+    c = hh(c, d, a, b, x[i + 3] || 0, 16, -722521979);
+    b = hh(b, c, d, a, x[i + 6] || 0, 23, 76029189);
+    a = hh(a, b, c, d, x[i + 9] || 0, 4, -640364487);
+    d = hh(d, a, b, c, x[i + 12] || 0, 11, -421815835);
+    c = hh(c, d, a, b, x[i + 15] || 0, 16, 530742520);
+    b = hh(b, c, d, a, x[i + 2] || 0, 23, -995338651);
+    a = ii(a, b, c, d, x[i + 0] || 0, 6, -198630844);
+    d = ii(d, a, b, c, x[i + 7] || 0, 10, 1126891415);
+    c = ii(c, d, a, b, x[i + 14] || 0, 15, -1416354905);
+    b = ii(b, c, d, a, x[i + 5] || 0, 21, -57434055);
+    a = ii(a, b, c, d, x[i + 12] || 0, 6, 1700485571);
+    d = ii(d, a, b, c, x[i + 3] || 0, 10, -1894986606);
+    c = ii(c, d, a, b, x[i + 10] || 0, 15, -1051523);
+    b = ii(b, c, d, a, x[i + 1] || 0, 21, -2054922799);
+    a = ii(a, b, c, d, x[i + 8] || 0, 6, 1873313359);
+    d = ii(d, a, b, c, x[i + 15] || 0, 10, -30611744);
+    c = ii(c, d, a, b, x[i + 6] || 0, 15, -1560198380);
+    b = ii(b, c, d, a, x[i + 13] || 0, 21, 1309151649);
+    a = ii(a, b, c, d, x[i + 4] || 0, 6, -145523070);
+    d = ii(d, a, b, c, x[i + 11] || 0, 10, -1120210379);
+    c = ii(c, d, a, b, x[i + 2] || 0, 15, 718787259);
+    b = ii(b, c, d, a, x[i + 9] || 0, 21, -343485551);
+    a = (a + oa) | 0;
+    b = (b + ob) | 0;
+    c = (c + oc) | 0;
+    d = (d + od) | 0;
+  }
+  return [a, b, c, d].map(toHex).join("");
 }
 
 async function buildRobokassaPaymentUrl(env, userId, amount, description) {
@@ -117,21 +223,29 @@ async function buildRobokassaPaymentUrl(env, userId, amount, description) {
   }
 
   const invId = `${Date.now()}_${userId}`;
-  const signature = await sha256Hex(
+  const signature = md5(
     `${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${invId}:${env.ROBOKASSA_PASSWORD_1}`
   );
+  return {
+    actionUrl: env.ROBOKASSA_PAYMENT_URL,
+    fields: {
+      MerchantLogin: env.ROBOKASSA_MERCHANT_LOGIN,
+      OutSum: String(amount),
+      InvId: invId,
+      Description: description,
+      SignatureValue: signature,
+      IsTest: env.ROBOKASSA_TEST_MODE || "1",
+      Culture: "ru",
+    },
+  };
+}
 
-  const params = new URLSearchParams({
-    MerchantLogin: env.ROBOKASSA_MERCHANT_LOGIN,
-    OutSum: String(amount),
-    InvId: invId,
-    Description: description,
-    SignatureValue: signature.toUpperCase(),
-    IsTest: env.ROBOKASSA_TEST_MODE || "1",
-    Culture: "ru",
-  });
-
-  return `${env.ROBOKASSA_PAYMENT_URL}?${params.toString()}`;
+function buildPaymentEntryUrl(env, userId) {
+  const base = env.WORKER_URL || "";
+  if (!base) return env.PAYMENT_URL || "/pay";
+  const url = new URL(env.PAYMENT_URL || "/pay", base);
+  url.searchParams.set("user_id", String(userId));
+  return url.toString();
 }
 
 async function robokassaResultResponse(request, env) {
@@ -147,17 +261,27 @@ async function robokassaResultResponse(request, env) {
   const outSum = formValue(new URLSearchParams(payload), "OutSum");
   const invId = formValue(new URLSearchParams(payload), "InvId");
   const signatureValue = formValue(new URLSearchParams(payload), "SignatureValue").toUpperCase();
-  const expected = (await sha256Hex(`${outSum}:${invId}:${env.ROBOKASSA_PASSWORD_2}`)).toUpperCase();
+  const expected = md5(`${outSum}:${invId}:${env.ROBOKASSA_PASSWORD_2}`);
 
-  if (!outSum || !invId || signatureValue !== expected) {
+  if (!outSum || !invId || signatureValue !== expected.toUpperCase()) {
     return new Response("bad sign", { status: 400 });
   }
 
-  const stage = await dbOne(env, "SELECT * FROM content_stages WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", [Number(String(invId).split("_").pop())]);
+  const userId = Number(String(invId).split("_").pop());
+  const stage = await dbOne(env, "SELECT * FROM content_stages WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", [userId]);
   if (stage && !stage.payment_completed_at) {
     await upsertContentStage(env, stage.user_id, "payment_completed", {
       payment_completed_at: new Date().toISOString(),
     });
+    const user = await getUserByTgId(env, userId);
+    if (user) {
+      const inviteLink = await createInviteLink(env.BOT_TOKEN, env.PRIVATE_CHANNEL_ID, userId);
+      await sendMessage(
+        env.BOT_TOKEN,
+        userId,
+        `Оплата подтверждена. Вот ссылка на закрытый канал:\n${inviteLink}`
+      );
+    }
   }
 
   return new Response(`OK${invId}`, { status: 200 });
@@ -392,7 +516,7 @@ async function sendMethodPost(env, chatId, userId) {
     "<b>И самое главное:</b> Мои видео, которые приносят мне 300к рублей продаж ежемесячно. Ну и конечно, сами партнерские продукты тоже прилагаются, как же без них)\n\n" +
     "<b>Просто переходи по ссылке ниже и забирай базу + полную стратегию по Партнерскому маркетингу для выхода на 100к+ в месяц</b>";
 
-  await sendMessage(env.BOT_TOKEN, chatId, message, paymentKeyboard(env.PAYMENT_URL || "/pay"));
+  await sendMessage(env.BOT_TOKEN, chatId, message, paymentKeyboard(buildPaymentEntryUrl(env, userId)));
   await upsertContentStage(env, userId, "method_sent", {});
 }
 
@@ -419,7 +543,7 @@ async function sendPaymentPost(env, chatId, userId) {
     "<b>Только в течение 24 часов всю методику + базу с видео не за 4990, а за 1490 рублей!</b>\n\n" +
     "<b>Все это уже ждет внутри.\nЖми кнопку ниже и забирай👇</b>";
 
-  await sendMessage(env.BOT_TOKEN, chatId, message, paymentKeyboard(env.PAYMENT_URL || "/pay"));
+  await sendMessage(env.BOT_TOKEN, chatId, message, paymentKeyboard(buildPaymentEntryUrl(env, userId)));
   await upsertContentStage(env, userId, "payment_sent", { payment_sent_at: new Date().toISOString() });
 }
 
@@ -432,7 +556,7 @@ async function sendPaymentReminder1(env, chatId, userId) {
     "Если бы тебе предложили вложить 1490 рублей и сказали, что через месяц они превратятся в 100 тысяч рублей, согласился бы? - Задумайся над этим\n\n" +
     "Заверши начатое по ссылке 👇";
 
-  await sendMessage(env.BOT_TOKEN, chatId, message, reminder1Keyboard(env.PAYMENT_URL || "/pay"));
+  await sendMessage(env.BOT_TOKEN, chatId, message, reminder1Keyboard(buildPaymentEntryUrl(env, userId)));
   await upsertContentStage(env, userId, "payment_reminder1_sent", {
     payment_reminder1_at: new Date().toISOString(),
   });
@@ -458,7 +582,7 @@ async function sendPaymentReminder2(env, chatId, userId) {
     env.BOT_TOKEN,
     chatId,
     message,
-    reminder2Keyboard(env.PAYMENT_URL || "/pay")
+    reminder2Keyboard(buildPaymentEntryUrl(env, userId))
   );
   if (env.SCREENSHOT_4_URL) {
     try {
@@ -1111,13 +1235,13 @@ export default {
         return json({ ok: true, service: "tg-bot-dozmobot" });
       }
       if (url.pathname === "/pay") {
-        const paymentUrl = await buildRobokassaPaymentUrl(
+        const payment = await buildRobokassaPaymentUrl(
           env,
           url.searchParams.get("user_id") || 0,
           1490,
           "Доступ к методике партнерского маркетинга"
         );
-        return new Response(robokassaFormHtml(paymentUrl, {}), {
+        return new Response(robokassaFormHtml(payment.actionUrl, payment.fields), {
           headers: { "content-type": "text/html; charset=utf-8" },
         });
       }

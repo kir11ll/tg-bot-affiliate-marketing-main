@@ -276,19 +276,28 @@ async function sendFollowupPost(env, chatId, userId) {
     "Ну что? Готов погрузиться в эту сферу и уже через 2 дня заработать первые деньги в интернете? - Забирай методику по кнопке ниже и начинай работу!\n\n" +
     "<b>ОЧЕНЬ ВАЖНО</b> придерживаться каждого шага стратегии!";
 
-  await telegramRequest(env.BOT_TOKEN, "sendMediaGroup", {
-    chat_id: chatId,
-    media: [
-      {
-        type: "photo",
-        media: env.SCREENSHOT_1_URL,
-        caption: message,
-        parse_mode: "HTML",
-      },
-      { type: "photo", media: env.SCREENSHOT_2_URL },
-      { type: "photo", media: env.SCREENSHOT_3_URL },
-    ],
-  });
+  const screenshots = [env.SCREENSHOT_1_URL, env.SCREENSHOT_2_URL, env.SCREENSHOT_3_URL].filter(Boolean);
+  try {
+    if (screenshots.length === 3) {
+      await telegramRequest(env.BOT_TOKEN, "sendMediaGroup", {
+        chat_id: chatId,
+        media: [
+          {
+            type: "photo",
+            media: screenshots[0],
+            caption: message,
+            parse_mode: "HTML",
+          },
+          { type: "photo", media: screenshots[1] },
+          { type: "photo", media: screenshots[2] },
+        ],
+      });
+    } else {
+      await sendMessage(env.BOT_TOKEN, chatId, message);
+    }
+  } catch (error) {
+    await sendMessage(env.BOT_TOKEN, chatId, message);
+  }
 
   await sendMessage(env.BOT_TOKEN, chatId, " ", followupKeyboard());
   await upsertContentStage(env, userId, "followup_sent", { followup_sent_at: new Date().toISOString() });
@@ -359,11 +368,15 @@ async function sendPaymentReminder2(env, chatId, userId) {
     reminder2Keyboard(env.PAYMENT_URL || "https://example.com/pay")
   );
   if (env.SCREENSHOT_4_URL) {
-    await telegramRequest(env.BOT_TOKEN, "sendPhoto", {
-      chat_id: chatId,
-      photo: env.SCREENSHOT_4_URL,
-      caption: " ",
-    });
+    try {
+      await telegramRequest(env.BOT_TOKEN, "sendPhoto", {
+        chat_id: chatId,
+        photo: env.SCREENSHOT_4_URL,
+        caption: " ",
+      });
+    } catch (error) {
+      // fallback: don't block the flow if the image is unavailable
+    }
   }
   await upsertContentStage(env, userId, "payment_reminder2_sent", {
     payment_reminder2_at: new Date().toISOString(),

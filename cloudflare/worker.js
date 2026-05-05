@@ -4,6 +4,7 @@ const MIN_WITHDRAWAL = 1000;
 const FOLLOWUP_DELAY_MINUTES = 20;
 const PAYMENT_REMINDER_1_MINUTES = 10;
 const PAYMENT_REMINDER_2_MINUTES = 15;
+const PRODUCT_PRICE = "1490.00";
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -1238,7 +1239,7 @@ export default {
         const payment = await buildRobokassaPaymentUrl(
           env,
           url.searchParams.get("user_id") || 0,
-          1490,
+          PRODUCT_PRICE,
           "Доступ к методике партнерского маркетинга"
         );
         return new Response(robokassaFormHtml(payment.actionUrl, payment.fields), {

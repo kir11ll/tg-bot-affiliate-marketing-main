@@ -556,7 +556,8 @@ async function handleStart(update, env) {
   const chatId = update.message?.chat?.id;
   if (!user || !chatId) return;
 
-  const payload = (update.message?.text || "").split(" ")[1] || "";
+  const text = update.message?.text || "";
+  const payload = text.split(" ")[1] || "";
   await createReferralIfNeeded(env, user, payload);
 
   if (payload === "partner" || payload === "cabinet") {
@@ -570,7 +571,11 @@ async function handleStart(update, env) {
   }
 
   const stage = await getContentStage(env, user.id);
-  if (!payload && stage?.stage === "article_sent" && !stage?.followup_sent_at) {
+  if (text === "/start" && stage?.stage === "article_sent" && !stage?.followup_sent_at) {
+    await sendFollowupPost(env, chatId, user.id);
+    return;
+  }
+  if (text.startsWith("/start") && stage?.stage === "article_sent" && !stage?.followup_sent_at) {
     await sendFollowupPost(env, chatId, user.id);
     return;
   }

@@ -279,7 +279,7 @@ async function sendFollowupPost(env, chatId, userId) {
   const screenshots = [env.SCREENSHOT_1_URL, env.SCREENSHOT_2_URL, env.SCREENSHOT_3_URL].filter(Boolean);
   try {
     if (screenshots.length === 3) {
-      await telegramRequest(env.BOT_TOKEN, "sendMediaGroup", {
+      const mediaResult = await telegramRequest(env.BOT_TOKEN, "sendMediaGroup", {
         chat_id: chatId,
         media: [
           {
@@ -292,6 +292,9 @@ async function sendFollowupPost(env, chatId, userId) {
           { type: "photo", media: screenshots[2] },
         ],
       });
+      if (!mediaResult?.ok) {
+        await sendMessage(env.BOT_TOKEN, chatId, message);
+      }
     } else {
       await sendMessage(env.BOT_TOKEN, chatId, message);
     }

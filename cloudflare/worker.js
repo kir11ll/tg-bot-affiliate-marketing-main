@@ -218,14 +218,13 @@ function md5(input) {
   return [a, b, c, d].map(toHex).join("");
 }
 
-async function buildRobokassaPaymentUrl(env, userId, amount, description) {
+async function buildRobokassaPaymentUrl(env, invId, amount, description) {
   if (!env.ROBOKASSA_MERCHANT_LOGIN || !env.ROBOKASSA_PASSWORD_1 || !env.ROBOKASSA_PAYMENT_URL) {
     throw new Error("Robokassa is not configured");
   }
 
-  const invId = String(Date.now());
   const signature = md5(
-    `${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${invId}:${env.ROBOKASSA_PASSWORD_1}:Shp_user_id=${userId}`
+    `${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${invId}:${env.ROBOKASSA_PASSWORD_1}`
   );
   return {
     actionUrl: env.ROBOKASSA_PAYMENT_URL,
@@ -234,7 +233,6 @@ async function buildRobokassaPaymentUrl(env, userId, amount, description) {
       OutSum: String(amount),
       InvId: invId,
       Description: description,
-      Shp_user_id: String(userId),
       SignatureValue: signature,
       IsTest: env.ROBOKASSA_TEST_MODE || "1",
       Culture: "ru",
@@ -242,8 +240,8 @@ async function buildRobokassaPaymentUrl(env, userId, amount, description) {
   };
 }
 
-async function buildRobokassaDebug(env, userId, amount, description) {
-  const payment = await buildRobokassaPaymentUrl(env, userId, amount, description);
+async function buildRobokassaDebug(env, userId, invId, amount, description) {
+  const payment = await buildRobokassaPaymentUrl(env, invId, amount, description);
   const rows = Object.entries(payment.fields)
     .map(([key, value]) => `<tr><td><b>${htmlEscape(key)}</b></td><td>${htmlEscape(value)}</td></tr>`)
     .join("");
@@ -267,7 +265,7 @@ async function buildRobokassaDebug(env, userId, amount, description) {
       <h1>Robokassa debug</h1>
       <p>Ниже поля, которые уходят в форму оплаты.</p>
       <p><b>Action URL:</b> ${htmlEscape(payment.actionUrl)}</p>
-      <p><b>Signature base:</b> ${htmlEscape(`${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${payment.fields.InvId}:${env.ROBOKASSA_PASSWORD_1}:Shp_user_id=${userId}`)}</p>
+      <p><b>Signature base:</b> ${htmlEscape(`${env.ROBOKASSA_MERCHANT_LOGIN}:${amount}:${payment.fields.InvId}:${env.ROBOKASSA_PASSWORD_1}`)}</p>
       <table>${rows}</table>
       <a class="btn" href="/pay?user_id=${encodeURIComponent(userId)}">Перейти к оплате</a>
     </div>
@@ -303,8 +301,9 @@ async function robokassaResultResponse(request, env) {
     return new Response("bad sign", { status: 400 });
   }
 
-  const userId = Number(shpUserId || 0);
-  const stage = await dbOne(env, "SELECT * FROM content_stages WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", [userId]);
+  const requestRow = await dbOne(env, "SELECT * FROM payment_requests WHERE inv_id = ?", [invId]);
+  const userId = Number(requestRow?.user_id || 0);
+  const stage = userId ? await dbOne(env, "SELECT * FROM content_stages WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", [userId]) : null;
   if (stage && !stage.payment_completed_at) {
     await upsertContentStage(env, stage.user_id, "payment_completed", {
       payment_completed_at: new Date().toISOString(),
@@ -312,11 +311,10 @@ async function robokassaResultResponse(request, env) {
     const user = await getUserByTgId(env, userId);
     if (user) {
       const inviteLink = await createInviteLink(env.BOT_TOKEN, env.PRIVATE_CHANNEL_ID, userId);
-      await sendMessage(
-        env.BOT_TOKEN,
-        userId,
-        `Оплата подтверждена. Вот ссылка на закрытый канал:\n${inviteLink}`
-      );
+      await sendMessage(env.BOT_TOKEN, userId, `Оплата подтверждена. Вот ссылка на закрытый канал:\n${inviteLink}`);
+    }
+    if (requestRow) {
+      await dbRun(env, "UPDATE payment_requests SET status = 'paid' WHERE inv_id = ?", [invId]);
     }
   }
 
@@ -1196,6 +1194,10 @@ async function ensureSchema(env) {
   );
   await dbRun(
     env,
+    "CREATE TABLE IF NOT EXISTS payment_requests (inv_id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, amount REAL NOT NULL, created_at TEXT NOT NULL, status TEXT NOT NULL)"
+  );
+  await dbRun(
+    env,
     "CREATE TABLE IF NOT EXISTS referral_earnings (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, payment_id TEXT, amount REAL, reward REAL, created_at TEXT)"
   );
   await dbRun(
@@ -1271,12 +1273,24 @@ export default {
         return json({ ok: true, service: "tg-bot-dozmobot" });
       }
       if (url.pathname === "/pay") {
-        const userId = url.searchParams.get("user_id") || 0;
+        const userId = Number(url.searchParams.get("user_id") || 0);
+        if (!userId) {
+          return json({ ok: false, error: "user_id required" }, 400);
+        }
+        const invId = String(Date.now());
+        await dbRun(env, "INSERT OR REPLACE INTO payment_requests (inv_id, user_id, amount, created_at, status) VALUES (?, ?, ?, ?, ?)", [
+          invId,
+          userId,
+          PRODUCT_PRICE,
+          new Date().toISOString(),
+          "pending",
+        ]);
         if (url.searchParams.get("debug") === "1") {
           return new Response(
             await buildRobokassaDebug(
               env,
               userId,
+              invId,
               PRODUCT_PRICE,
               "Доступ к методике партнерского маркетинга"
             ),
@@ -1287,7 +1301,7 @@ export default {
         }
         const payment = await buildRobokassaPaymentUrl(
           env,
-          userId,
+          invId,
           PRODUCT_PRICE,
           "Доступ к методике партнерского маркетинга"
         );

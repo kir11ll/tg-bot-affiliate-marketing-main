@@ -1,4 +1,4 @@
-const TELEGRAM_API = "https://api.telegram.org";
+﻿const TELEGRAM_API = "https://api.telegram.org";
 const REF_BONUS_RATE = 0.3;
 const MIN_WITHDRAWAL = 1000;
 const FOLLOWUP_DELAY_MINUTES = 20;
@@ -306,7 +306,12 @@ async function sendFollowupPost(env, chatId, userId) {
     await sendMessage(env.BOT_TOKEN, chatId, message);
   }
 
-  await sendMessage(env.BOT_TOKEN, chatId, " ", followupKeyboard());
+  await sendMessage(
+    env.BOT_TOKEN,
+    chatId,
+    "Чтобы продолжить, нажми кнопку ниже 👇\n\n<b>ОЧЕНЬ ВАЖНО придерживаться каждого шага стратегии!</b>",
+    followupKeyboard()
+  );
   await upsertContentStage(env, userId, "followup_sent", { followup_sent_at: new Date().toISOString() });
 }
 
@@ -1105,3 +1110,4 @@ export default {
     ctx.waitUntil(sendPaymentReminders(env));
   },
 };
+

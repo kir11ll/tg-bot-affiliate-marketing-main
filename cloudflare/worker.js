@@ -280,36 +280,14 @@ async function sendFollowupPost(env, chatId, userId) {
     "Поэтому я и создал ту самую стратегию, куда уместил все свои знания в одно место, чтобы любой смог ее применить и выйти на первые 100к в месяц на Партнерском маркетинге.\n\n" +
     "<b>Ну что, готов погрузиться в эту сферу более подробно?</b> - Забирай методику по кнопке ниже и начинай работу!";
 
-  const screenshots = [env.SCREENSHOT_1_URL, env.SCREENSHOT_2_URL, env.SCREENSHOT_3_URL].filter(Boolean);
-  try {
-    if (screenshots.length === 3) {
-      const mediaResult = await telegramRequest(env.BOT_TOKEN, "sendMediaGroup", {
-        chat_id: chatId,
-        media: [
-          {
-            type: "photo",
-            media: screenshots[0],
-            caption: message,
-            parse_mode: "HTML",
-          },
-          { type: "photo", media: screenshots[1] },
-          { type: "photo", media: screenshots[2] },
-        ],
-      });
-      if (!mediaResult?.ok) {
-        await sendMessage(env.BOT_TOKEN, chatId, message);
-      }
-    } else {
-      await sendMessage(env.BOT_TOKEN, chatId, message);
-    }
-  } catch (error) {
-    await sendMessage(env.BOT_TOKEN, chatId, message);
-  }
-
   await sendMessage(
     env.BOT_TOKEN,
     chatId,
-    "Чтобы продолжить, нажми кнопку ниже 👇\n\n<b>ОЧЕНЬ ВАЖНО придерживаться каждого шага стратегии!</b>\n\nПолучай методику по кнопке под этим сообщением.",
+    message +
+      "\n\n" +
+      "Чтобы продолжить, нажми кнопку ниже 👇\n\n" +
+      "<b>ОЧЕНЬ ВАЖНО придерживаться каждого шага стратегии!</b>\n\n" +
+      "Получай методику по кнопке под этим сообщением.",
     followupKeyboard()
   );
   await upsertContentStage(env, userId, "followup_sent", { followup_sent_at: new Date().toISOString() });

@@ -1205,7 +1205,7 @@ async function sendDelayedFollowups(env) {
 
 async function sendPaymentReminders(env) {
   const reminder1Cutoff = new Date(Date.now() - PAYMENT_REMINDER_1_MINUTES * 60 * 1000).toISOString();
-  const reminder2Cutoff = new Date(Date.now() - (FOLLOWUP_DELAY_MINUTES + PAYMENT_REMINDER_2_MINUTES) * 60 * 1000).toISOString();
+  const reminder2Cutoff = new Date(Date.now() - PAYMENT_REMINDER_2_MINUTES * 60 * 1000).toISOString();
 
   const reminder1Rows = await dbAll(
     env,
@@ -1218,7 +1218,7 @@ async function sendPaymentReminders(env) {
 
   const reminder2Rows = await dbAll(
     env,
-    "SELECT user_id FROM content_stages WHERE stage IN ('payment_sent','payment_reminder1_sent') AND updated_at <= ? AND payment_completed_at IS NULL AND payment_reminder1_at IS NOT NULL AND payment_reminder2_at IS NULL",
+    "SELECT user_id FROM content_stages WHERE stage = 'payment_reminder1_sent' AND updated_at <= ? AND payment_completed_at IS NULL AND payment_reminder1_at IS NOT NULL AND payment_reminder2_at IS NULL",
     [reminder2Cutoff]
   );
   for (const row of reminder2Rows.results || []) {
